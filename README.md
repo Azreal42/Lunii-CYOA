@@ -9,7 +9,11 @@ Goal: build a pipeline that turns authored choose-your-own-adventure content int
 - Integrate TTS (e.g., ElevenLabs) and image generation steps where useful, but keep the TOML the single source of truth.
 
 ## Key Artifact
-- Story schema: `toml-specification.md` (this repo) — normative spec for `story.toml`.
+- Story schema: `toml-specification.md` (this repo) – normative spec for `story.toml`.
+
+## ElevenLabs setup
+- Copy `.env.example` to `.env` and set `ELEVENLABS_API_KEY` (and optionally override `ELEVENLABS_VOICE_ID`/`ELEVENLABS_MODEL_ID`).
+- The helper in `lunii_cyoa.tts` writes synthesized audio to disk; unit tests mock the client to avoid real API calls.
 
 ## High-Level Flow
 1. Write or generate TOML + assets according to the spec.
