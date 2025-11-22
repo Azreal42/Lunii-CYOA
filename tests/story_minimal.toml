@@ -1,0 +1,30 @@
+[story]
+id = "demo-minimal"
+start_node = "intro"
+title.en = "Minimal Demo"
+
+[assets]
+base_dir = "assets"
+audio_ext = "mp3"
+image_ext = "png"
+audio_target = "mp3_44k1_mono_64kbps"
+image_target = "bmp_320x240_4bpp"
+
+[state.hp]
+type = "int"
+min = 0
+max = 3
+default = 3
+
+[[nodes]]
+id = "intro"
+kind = "story"
+bg = "img/intro.png"
+audio = "audio/intro.mp3"
+target = "end"
+
+[[nodes]]
+id = "end"
+kind = "story"
+bg = "img/end.png"
+audio = "audio/end.mp3"

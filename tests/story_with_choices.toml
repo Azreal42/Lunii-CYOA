@@ -1,0 +1,62 @@
+[story]
+id = "demo-choices"
+start_node = "entrance"
+title.en = "Choices Demo"
+
+[assets]
+base_dir = "assets"
+audio_ext = "mp3"
+image_ext = "png"
+audio_target = "mp3_44k1_mono_64kbps"
+image_target = "bmp_320x240_4bpp"
+
+[state.key]
+type = "bool"
+
+[[nodes]]
+id = "entrance"
+kind = "menu"
+bg = "img/entrance.png"
+audio = "audio/entrance.mp3"
+
+[[nodes.choices]]
+id = "take_key"
+label_text = "Pick up key"
+target = "hall"
+effects = [{ var = "key", op = "=", value = true }]
+
+[[nodes.choices]]
+id = "ignore_key"
+label_text = "Ignore key"
+target = "hall"
+
+[[nodes]]
+id = "hall"
+kind = "branch"
+bg = "img/hall.png"
+audio = "audio/hall.mp3"
+
+[[nodes.choices]]
+id = "locked_door"
+label_text = "Open locked door"
+target = "treasure"
+guard = "key == true"
+
+[[nodes.choices]]
+id = "blocked"
+label_text = "Door is locked"
+target = "end"
+guard = "key == false"
+
+[[nodes]]
+id = "treasure"
+kind = "story"
+bg = "img/treasure.png"
+audio = "audio/treasure.mp3"
+target = "end"
+
+[[nodes]]
+id = "end"
+kind = "story"
+bg = "img/end.png"
+audio = "audio/end.mp3"

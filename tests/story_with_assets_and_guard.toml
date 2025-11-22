@@ -1,0 +1,80 @@
+[story]
+id = "demo-guarded"
+start_node = "gate"
+title.en = "Guarded Choice Demo"
+
+[assets]
+base_dir = "assets"
+audio_ext = "mp3"
+image_ext = "png"
+audio_target = "mp3_44k1_mono_64kbps"
+image_target = "bmp_320x240_4bpp"
+auto_generate_menu_audio = true
+auto_generate_menu_image = true
+
+[state.ticket]
+type = "enum"
+values = ["none", "bronze", "gold"]
+default = "none"
+
+[state.hp]
+type = "int"
+min = 0
+max = 3
+default = 2
+
+[[nodes]]
+id = "gate"
+kind = "menu"
+bg = "img/gate.png"
+audio = "audio/gate.mp3"
+
+[[nodes.choices]]
+id = "buy_ticket"
+label_text = "Buy bronze ticket"
+target = "gate_after_purchase"
+effects = [{ var = "ticket", op = "=", value = "bronze" }]
+
+[[nodes.choices]]
+id = "sneak_in"
+label_text = "Sneak in"
+target = "caught"
+effects = [{ var = "hp", op = "-=", value = 1 }]
+
+[[nodes]]
+id = "gate_after_purchase"
+kind = "branch"
+bg = "img/gate2.png"
+audio = "audio/gate2.mp3"
+
+[[nodes.choices]]
+id = "enter_with_ticket"
+label_text = "Enter with ticket"
+target = "inside"
+guard = "ticket == \"bronze\""
+
+[[nodes.choices]]
+id = "denied_no_ticket"
+label_text = "Denied: no ticket"
+target = "caught"
+guard = "ticket == \"none\""
+
+[[nodes]]
+id = "inside"
+kind = "story"
+bg = "img/inside.png"
+audio = "audio/inside.mp3"
+target = "end"
+
+[[nodes]]
+id = "caught"
+kind = "story"
+bg = "img/caught.png"
+audio = "audio/caught.mp3"
+target = "end"
+
+[[nodes]]
+id = "end"
+kind = "story"
+bg = "img/end.png"
+audio = "audio/end.mp3"

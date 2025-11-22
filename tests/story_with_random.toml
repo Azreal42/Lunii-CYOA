@@ -1,0 +1,64 @@
+[story]
+id = "demo-random"
+start_node = "crossroad"
+title.en = "Random Path Demo"
+
+[assets]
+base_dir = "assets"
+audio_ext = "mp3"
+image_ext = "png"
+audio_target = "mp3_44k1_mono_64kbps"
+image_target = "bmp_320x240_4bpp"
+
+[state.hp]
+type = "int"
+min = 0
+max = 5
+default = 5
+
+[state.mood]
+type = "enum"
+values = ["calm", "alert", "frightened"]
+default = "calm"
+
+[[nodes]]
+id = "crossroad"
+kind = "random"
+bg = "img/crossroad.png"
+audio = "audio/crossroad.mp3"
+
+[[nodes.random.options]]
+target = "left_path"
+
+[[nodes.random.options]]
+target = "right_path"
+
+[[nodes.random.options]]
+target = "backtrack"
+
+[[nodes]]
+id = "left_path"
+kind = "story"
+bg = "img/left.png"
+audio = "audio/left.mp3"
+target = "end"
+
+[[nodes]]
+id = "right_path"
+kind = "story"
+bg = "img/right.png"
+audio = "audio/right.mp3"
+target = "end"
+
+[[nodes]]
+id = "backtrack"
+kind = "story"
+bg = "img/back.png"
+audio = "audio/back.mp3"
+target = "end"
+
+[[nodes]]
+id = "end"
+kind = "story"
+bg = "img/end.png"
+audio = "audio/end.mp3"
