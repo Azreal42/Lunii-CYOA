@@ -1,16 +1,26 @@
 from __future__ import annotations
 
 from typing import Dict, List, Literal, Union, Annotated
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, model_validator, ConfigDict
 
 
 class StoryMetadata(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
     id: str
     start_node: str
     title: Dict[str, str] = Field(default_factory=dict)
     version: str | None = None
     thumbnail: str | None = None
     output_uuid: str | None = None
+
+    def get_default_value(self, var_name: str) -> int | None:
+        key = f"default_value_{var_name}"
+        extra = getattr(self, "__pydantic_extra__", {}) or {}
+        value = extra.get(key)
+        if isinstance(value, int):
+            return value
+        return None
 
 
 class AssetsConfig(BaseModel):

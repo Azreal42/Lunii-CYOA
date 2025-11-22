@@ -2,7 +2,8 @@ from pathlib import Path
 
 import pytest
 
-from lunii_cyoa import StoryDocument, StoryLoadError, load_story
+from lunii_cyoa.loader import load_story, StoryLoadError
+from lunii_cyoa.models import StoryDocument
 
 
 FIXTURE_DIR = Path(__file__).parent
