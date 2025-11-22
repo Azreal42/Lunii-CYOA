@@ -5,7 +5,6 @@ from typing import Any, Dict, List
 
 StateSnapshot = Dict[str, Any]
 
-
 @dataclass
 class PhysicalNode:
     physical_id: int
