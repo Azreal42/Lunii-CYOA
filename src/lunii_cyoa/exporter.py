@@ -1,15 +1,16 @@
 from __future__ import annotations
 
-import json
 import shutil
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Tuple
 from uuid import uuid4
 
 from .expansion import expand_story
 from .loader import load_story
 from .models import StoryDocument
-from .structures import ExpansionResult, PhysicalNode
+from .structures import ExpansionResult
+from pkg.api.studio_builder import ActionNodeSpec, StageNodeSpec, StudioStoryBuilder
+from pkg.api.stories import StudioStory
 
 
 class ExportError(Exception):
@@ -26,17 +27,18 @@ class StudioExporter:
         doc = load_story(self.story_path)
         expansion = expand_story(doc)
         stage_map = self._build_stage_map(expansion, doc)
-        action_nodes = self._build_action_nodes(expansion, stage_map)
-        stage_nodes = self._build_stage_nodes(expansion, doc, stage_map, action_nodes)
-        story_json = {
-            "format": 1,
-            "version": 1,
-            "title": self._primary_title(doc),
-            "description": "",
-            "stageNodes": stage_nodes,
-            "actionNodes": action_nodes,
-        }
-        self._write_story(story_json)
+        action_nodes, action_lookup = self._build_action_nodes(expansion, stage_map)
+        stage_nodes = self._build_stage_nodes(expansion, doc, stage_map, action_lookup)
+        builder = StudioStoryBuilder(
+            title=self._primary_title(doc),
+            description="",
+            format_version=1,
+            pack_version=1,
+        )
+        builder.stage_nodes = stage_nodes
+        builder.action_nodes = action_nodes
+        story = builder.to_studio_story()
+        self._write_story(story)
         if self.copy_assets:
             self._copy_assets(doc, stage_nodes)
         return self.output_dir / "story.json"
@@ -49,30 +51,31 @@ class StudioExporter:
     def _build_stage_map(self, expansion: ExpansionResult, doc: StoryDocument) -> Dict[int, str]:
         return {node.physical_id: str(uuid4()).upper() for node in expansion.physical_nodes}
 
-    def _build_action_nodes(self, expansion: ExpansionResult, stage_map: Dict[int, str]) -> List[dict]:
-        action_nodes: List[dict] = []
+    def _build_action_nodes(self, expansion: ExpansionResult, stage_map: Dict[int, str]) -> Tuple[List[ActionNodeSpec], Dict[int, str]]:
+        action_nodes: List[ActionNodeSpec] = []
+        action_lookup: Dict[int, str] = {}
         for node in expansion.physical_nodes:
             if not node.outgoing:
                 continue
             action_id = str(uuid4()).upper()
             options = [stage_map[target] for target in node.outgoing]
             action_nodes.append({"id": action_id, "options": options})
-            node._action_id = action_id  # type: ignore[attr-defined]
-        return action_nodes
+            action_lookup[node.physical_id] = action_id
+        return action_nodes, action_lookup
 
-    def _build_stage_nodes(self, expansion: ExpansionResult, doc: StoryDocument, stage_map: Dict[int, str], action_nodes: List[dict]) -> List[dict]:
+    def _build_stage_nodes(self, expansion: ExpansionResult, doc: StoryDocument, stage_map: Dict[int, str], action_lookup: Dict[int, str]) -> List[StageNodeSpec]:
         logical_lookup = {n.id: n for n in doc.nodes}
-        stage_nodes: List[dict] = []
+        stage_nodes: List[StageNodeSpec] = []
         for phys in expansion.physical_nodes:
             logical = logical_lookup[phys.logical_id]
             stage_uuid = stage_map[phys.physical_id]
-            stage = {
+            stage: StageNodeSpec = {
                 "uuid": stage_uuid,
                 "image": logical.bg,
                 "audio": logical.audio,
             }
             if phys.outgoing:
-                action_id = getattr(phys, "_action_id")  # type: ignore[attr-defined]
+                action_id = action_lookup[phys.physical_id]
                 if logical.kind == "random":
                     option_index = -1
                 elif logical.kind in ("menu", "branch"):
@@ -84,21 +87,22 @@ class StudioExporter:
             stage_nodes.append(stage)
         return stage_nodes
 
-    def _write_story(self, story_json: dict) -> None:
+    def _write_story(self, story: StudioStory) -> None:
         self.output_dir.mkdir(parents=True, exist_ok=True)
         target = self.output_dir / "story.json"
-        target.write_text(json.dumps(story_json, indent=2), encoding="utf-8")
+        target.write_text(story.to_json(), encoding="utf-8")
 
-    def _copy_assets(self, doc: StoryDocument, stage_nodes: List[dict]) -> None:
+    def _copy_assets(self, doc: StoryDocument, stage_nodes: List[StageNodeSpec]) -> None:
         base_dir = (self.story_path.parent / doc.assets.base_dir).resolve()
         assets_out = self.output_dir / "assets"
         for stage in stage_nodes:
             for key in ("image", "audio"):
-                rel = stage.get(key)
-                if not rel:
+                rel_obj = stage.get(key)
+                if not isinstance(rel_obj, str) or not rel_obj:
                     continue
-                src = base_dir / rel
-                dest = assets_out / rel
+                rel_path = Path(rel_obj)
+                src = base_dir / rel_path
+                dest = assets_out / rel_path
                 dest.parent.mkdir(parents=True, exist_ok=True)
                 if src.exists():
                     shutil.copy2(src, dest)

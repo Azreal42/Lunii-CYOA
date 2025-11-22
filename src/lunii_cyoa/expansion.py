@@ -164,12 +164,15 @@ class EffectApplier:
         return new_state
 
     def _apply_int_effect(self, eff: Effect, current: int) -> int:
+        if not isinstance(eff.value, int):
+            raise EffectApplicationError(f"Int var '{eff.var}' requires integer value")
+        value = eff.value
         if eff.op == "=":
-            return eff.value
+            return value
         if eff.op == "+=":
-            return current + eff.value
+            return current + value
         if eff.op == "-=":
-            return current - eff.value
+            return current - value
         raise EffectApplicationError(f"Unsupported op '{eff.op}' for int var '{eff.var}'")
 
 
