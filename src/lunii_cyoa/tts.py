@@ -18,13 +18,17 @@ class TextToSpeechAPI(Protocol):
 
     def convert(self, *, text: str, voice_id: str, model_id: str, output_format: str) -> AudioContent:  # noqa: D401
         """Convert text to speech using the provided ElevenLabs model."""
+        ...
 
 
 @runtime_checkable
 class ElevenLabsClient(Protocol):
     """Protocol to describe the ElevenLabs client shape used in this module."""
 
-    text_to_speech: TextToSpeechAPI
+    @property
+    def text_to_speech(self) -> TextToSpeechAPI:
+        """Expose the text-to-speech API surface."""
+        ...
 
 
 def build_elevenlabs_client(api_key: str | None = None) -> ElevenLabsClient:

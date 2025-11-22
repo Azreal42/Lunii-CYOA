@@ -16,7 +16,11 @@ class FakeTextToSpeech:
 
 class FakeElevenLabsClient:
     def __init__(self, chunks: Iterable[bytes]) -> None:
-        self.text_to_speech = FakeTextToSpeech(chunks)
+        self._text_to_speech = FakeTextToSpeech(chunks)
+
+    @property
+    def text_to_speech(self) -> FakeTextToSpeech:
+        return self._text_to_speech
 
 
 def test_synthesize_to_file_writes_output(tmp_path: Path) -> None:

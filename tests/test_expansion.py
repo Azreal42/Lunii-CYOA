@@ -3,7 +3,7 @@ from pathlib import Path
 import pytest
 
 from lunii_cyoa.loader import load_story
-from lunii_cyoa.expansion import expand_story, ExpansionError, StoryExpander
+from lunii_cyoa.expansion import expand_story, ExpansionError
 
 
 FIXTURE_DIR = Path(__file__).parent

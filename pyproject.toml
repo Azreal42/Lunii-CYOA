@@ -9,13 +9,14 @@ dependencies = [
   "pydantic>=2.7.0,<3",
   "typer>=0.12.0",
   "rich>=13.7.0",
-  "pillow>=10.2.0,<11.0",
+  "pillow>=11.2.1,<12.0",
   "ffmpeg-python>=0.2.0",
   "pydub>=0.25.0",
   "tqdm>=4.66.0",
   "elevenlabs>=1.9.0",
   "python-dotenv>=1.0.1",
   "lunii-packs",
+  "pipelex>=0.15.7",
 ]
 
 [project.optional-dependencies]
@@ -60,7 +61,12 @@ indent-width = 4
 target-version = "py313"
 
 [tool.uv.sources]
-lunii-packs = { path = "third_party/lunii_packs-0.0.0-py3-none-any.whl" }
+lunii-packs = { path = "third_party/lunii_packs-0.0.1-py3-none-any.whl" }
+
+[dependency-groups]
+dev = [
+    "pyright>=1.1.407",
+]
 
 [tool.ruff.format]
 indent-style = "space"

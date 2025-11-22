@@ -3,9 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from lunii_cyoa.exporter import StudioExporter, ExportError
-from lunii_cyoa.loader import load_story
-from lunii_cyoa.expansion import expand_story
+from lunii_cyoa.exporter import StudioExporter
 
 
 FIXTURE_DIR = Path(__file__).parent
@@ -13,7 +11,6 @@ FIXTURE_DIR = Path(__file__).parent
 
 def test_export_creates_story_json(tmp_path: Path) -> None:
     story_path = FIXTURE_DIR / "story_with_random.toml"
-    assets_dir = tmp_path / "assets"
     # create dummy assets
     base = story_path.parent / "assets"
     (base / "img").mkdir(parents=True, exist_ok=True)
