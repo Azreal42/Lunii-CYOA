@@ -41,6 +41,7 @@ excluded_dirs = [
     ".ruff_cache",
     "node_modules",
     "results",
+    "experiments",
 ]
 
 [pipelex.builder_config]
