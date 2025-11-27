@@ -1,28 +1,59 @@
 domain = "cyoa"
-description = "Hour-long CYOA generator: chapters > stages > nodes; graph-only TOML; per-node .txt; menu image prompts via PipeImgGen; debug checkpoints. No TTS."
+description = "Hour-long CYOA generator: chapters > stages > nodes; graph-only TOML; per-node .txt; menu image prompts via PipeImgGen. No TTS."
 main_pipe = "build_cyoa_story"
+
+[concept.PlanningBundle]
+description = "Bundle of planning artifacts needed for downstream pipelines."
+
+[concept.PlanningBundle.structure]
+blueprint = { type = "dict", key_type = "text", value_type = "dict", description = "Blueprint content", required = true }
+characters = { type = "dict", key_type = "text", value_type = "dict", description = "Character bible content", required = true }
+chapters = { type = "dict", key_type = "text", value_type = "dict", description = "Chapters plan content", required = true }
+chapter_details = { type = "list", item_type = "dict", description = "Chapter detail items", required = true }
 
 
 # -------------------------
 # Pipes — design & planning
 # -------------------------
 
-[pipe.design_blueprint]
+[pipe.expand_story_brief]
 type = "PipeLLM"
 inputs = { brief = "StoryBrief", settings = "Settings" }
+output = "ExpandedStory"
+model = { model = "gpt-4o", temperature = 0.3 }
+prompt = """
+You are expanding a story brief for a CYOA author prompt.
+You will return a longer text with more details to help downstream planning.
+The expanded brief should still align with the original author prompt.
+You don't need to take a narrative tone; just expand the details, with key elements like setting, main character, main conflict, and themes.
+Brief:
+{{ (brief.native_prompt if brief is defined and brief.native_prompt is defined else "Dry run prompt") | tag("brief.native_prompt") }}
+Settings:
+{{ settings | default("Dry run settings") | tag("settings") }}
+"""
+
+
+[pipe.design_blueprint]
+type = "PipeLLM"
+inputs = { brief = "StoryBrief", settings = "Settings", high_level_story = "ExpandedStory" }
 output = "Blueprint"
 model = { model = "gpt-4o", temperature = 0.25 }
 system_prompt = """
 Lead interactive fiction designer. Use foldback + hubs/bottlenecks; converge every 2-3 choices; fail-forward pacing. Minimal state: hp in [1..3] plus two boolean item slots per chapter; reset items at chapter exit; small bounded randomness.
 """
 prompt = """
+You are designing a CYOA blueprint for an author prompt.
+
 Story capsule (must remain consistent across planning steps):
-- Title: @brief.working_title
-- Author prompt/logline: @brief.native_prompt
-- Audience: @brief.audience
-- Language: @brief.language
-- Genre/Tone: @brief.genre
-- Target runtime (minutes): @settings.target_runtime_min
+- Title: {{ (brief.working_title if brief is defined and brief.working_title is defined else "Working title") | tag("brief.working_title") }}
+- Author prompt/logline: {{ (brief.native_prompt if brief is defined and brief.native_prompt is defined else "Dry run prompt") | tag("brief.native_prompt") }}
+- Audience: {{ (brief.audience if brief is defined and brief.audience is defined else "8-10") | tag("brief.audience") }}
+- Language: {{ (brief.language if brief is defined and brief.language is defined else "en") | tag("brief.language") }}
+- Genre/Tone: {{ (brief.genre if brief is defined and brief.genre is defined else "adventure") | tag("brief.genre") }}
+- Target runtime (minutes): {{ (settings.target_runtime_min if settings is defined and settings.target_runtime_min is defined else 10) | tag("settings.target_runtime_min") }}
+
+High-level story details:
+@high_level_story
 
 Return JSON with keys:
 - patterns: structure/pacing for THIS logline (foldback, hubs, bottlenecks)
@@ -33,32 +64,55 @@ Return JSON with keys:
 
 [pipe.character_bible]
 type = "PipeLLM"
-inputs = { brief = "StoryBrief" }
+inputs = { brief = "StoryBrief", blueprint = "Blueprint", high_level_story = "ExpandedStory" }
 output = "CharacterBible"
 model = { model = "gpt-4o", temperature = 0.6 }
 prompt = """
 Use the story capsule to build a coherent cast.
-Return JSON: protagonist, allies, foes, neutrals, voices (each a short paragraph).
+Return JSON: List[protagonist], List[allies], List[foes], List[neutrals] (each a short paragraph).
 Rules:
 - Keep every role aligned with the author prompt setting/goal/genre.
 - Mention the main goal/setting when describing relationships.
-- Voices: give tempo/diction/emotional color matching the tone implied by @brief.genre/@brief.audience.
-LANG=@brief.language
+- Voices: give tempo/diction/emotional color matching the tone.
+LANG={{ (brief.language if brief is defined and brief.language is defined else "en") | tag("brief.language") }}
+
+Story capsule:
+- Title: {{ (brief.working_title if brief is defined and brief.working_title is defined else "Working title") | tag("brief.working_title") }}
+- Author prompt/logline: {{ (brief.native_prompt if brief is defined and brief.native_prompt is defined else "Dry run prompt") | tag("brief.native_prompt") }}
+- Audience: {{ (brief.audience if brief is defined and brief.audience is defined else "8-10") | tag("brief.audience") }}
+
+High-level story details:
+@high_level_story
+
+Blueprint:
+@blueprint
 """
 
 [pipe.chapterize]
 type = "PipeLLM"
-inputs = { brief = "StoryBrief", settings = "Settings" }
+inputs = { brief = "StoryBrief", settings = "Settings", blueprint = "Blueprint", characters = "CharacterBible", high_level_story = "ExpandedStory" }
 output = "ChaptersPlan"
 model = { model = "gpt-4o", temperature = 0.3 }
 prompt = """
-Create 6-8 chapters for THIS story (use the author prompt). Minutes_per_chapter must sum to ~ @settings.target_runtime_min.
+Create 6-8 chapters for THIS story (use the author prompt). Minutes_per_chapter must sum to ~ {{ (settings.target_runtime_min if settings is defined and settings.target_runtime_min is defined else 12) | tag("settings.target_runtime_min") }}.
 Return JSON with keys:
 - chapter_count (int)
 - chapter_titles (list; each title should reflect the setting/goal/characters from the prompt)
 - minutes_per_chapter (list[int] summing to target_runtime_min)
 - chapter_blurbs (list[str]; 2-3 sentences each, describing progress toward the goal in the same world/characters as the prompt)
-LANG=@brief.language
+LANG={{ (brief.language if brief is defined and brief.language is defined else "en") | tag("brief.language") }}
+
+Story brief:
+{{ (brief.native_prompt if brief is defined and brief.native_prompt is defined else "Dry run prompt") | tag("brief.native_prompt") }}
+
+Blueprint:
+@blueprint
+
+High-level story details:
+@high_level_story
+
+Characters:
+@characters
 """
 
 [pipe.chapters_to_outline_items]
@@ -75,29 +129,43 @@ function_name = "cyoa_outline_to_text"
 
 [pipe.expand_one_chapter]
 type = "PipeLLM"
-inputs = { chapter = "ChapterOutlineItem", brief = "StoryBrief" }
+inputs = { brief = "StoryBrief", chapter = "ChapterOutlineItem", high_level_story = "ExpandedStory", blueprint = "Blueprint", chapters = "ChaptersPlan", characters = "CharacterBible" }
 output = "ChapterDetail"
 model = { model = "gpt-4o", temperature = 0.35 }
 prompt = """
 You are outlining a single chapter for a CYOA.
-Inputs:
+
+Current chapter to outline:
+- Index: @chapter.index
 - Title: @chapter.title
 - Minutes: @chapter.minutes
 - Blurb: @chapter.blurb
-- Story brief: @brief.native_prompt (audience=@brief.audience, genre=@brief.genre, lang=@brief.language)
+- Story brief: {{ (brief.native_prompt if brief is defined and brief.native_prompt is defined else "Dry run prompt") | tag("brief.native_prompt") }} (audience={{ (brief.audience if brief is defined and brief.audience is defined else "8-10") | tag("brief.audience") }}, genre={{ (brief.genre if brief is defined and brief.genre is defined else "adventure") | tag("brief.genre") }}, LANG={{ (brief.language if brief is defined and brief.language is defined else "en") | tag("brief.language") }})
+
+Blueprint:
+@blueprint
+
+High-level story details: 
+@high_level_story
+
+Chapters plan:
+@chapters
+
+Characters:
+@characters
 
 Return JSON:
 {
   "index": @chapter.index,
   "title": @chapter.title,
   "minutes": @chapter.minutes,
-  "detailed_summary": "3-5 sentences expanding the blurb with clear start/middle/end for this chapter",
+  "detailed_summary": "few **pages** (no need to be short) expanding the blurb with clear start/middle/end for this chapter",
   "beats": ["ordered key beats (short, imperative)", "..."],
   "obstacles": "main conflicts or decisions in this chapter",
   "mood": "tone for narration and SFX (optional)"
 }
 Ensure content stays in the same world/goal as the brief; no off-genre drift.
-LANG=@brief.language
+LANG={{ (brief.language if brief is defined and brief.language is defined else "en") | tag("brief.language") }}
 """
 
 [pipe.expand_chapters_sequential]
@@ -109,7 +177,7 @@ prompt = """
 You are expanding chapter blurbs into detailed chapter plans, in ORDER, keeping continuity.
 Inputs:
 - chapters_text: JSON array of {index, title, minutes, blurb}
-- brief: author prompt (@brief.native_prompt), language (@brief.language), audience (@brief.audience), genre (@brief.genre)
+- brief: author prompt ({{ (brief.native_prompt if brief is defined and brief.native_prompt is defined else "Dry run prompt") | tag("brief.native_prompt") }}), language ({{ (brief.language if brief is defined and brief.language is defined else "en") | tag("brief.language") }}), audience ({{ (brief.audience if brief is defined and brief.audience is defined else "8-10") | tag("brief.audience") }}), genre ({{ (brief.genre if brief is defined and brief.genre is defined else "adventure") | tag("brief.genre") }})
 - characters: character bible summary (use to keep cast consistent)
 
 Chapters JSON:
@@ -132,7 +200,7 @@ Rules:
 - You MUST output exactly one item per element of chapters_text; items.length == len(chapters_text array). Do not stop early.
 - Keep setting/goal/characters from brief and character bible; no new off-theme casts.
 - Minutes must match the provided per-chapter minutes.
-LANG=@brief.language
+LANG={{ (brief.language if brief is defined and brief.language is defined else "en") | tag("brief.language") }}
 """
 
 [pipe.require_complete_chapter_details]
@@ -141,11 +209,35 @@ inputs = { chapter_details = "ChapterDetail[]", chapter_outline_items = "Chapter
 output = "ChapterDetail[]"
 function_name = "cyoa_require_complete_chapter_details"
 
-[pipe.persist_chapter_details]
+[pipe.pack_planning_bundle]
 type = "PipeFunc"
-inputs = { chapter_details = "ChapterDetail[]", settings = "Settings" }
-output = "ChapterDetailsPath"
-function_name = "cyoa_persist_chapter_details"
+inputs = { blueprint = "Blueprint", characters = "CharacterBible", chapters = "ChaptersPlan", chapter_details = "ChapterDetail[]" }
+output = "PlanningBundle"
+function_name = "cyoa_pack_planning_bundle"
+
+[pipe.bundle_to_blueprint]
+type = "PipeFunc"
+inputs = { bundle = "PlanningBundle" }
+output = "Blueprint"
+function_name = "cyoa_bundle_to_blueprint"
+
+[pipe.bundle_to_characters]
+type = "PipeFunc"
+inputs = { bundle = "PlanningBundle" }
+output = "CharacterBible"
+function_name = "cyoa_bundle_to_characters"
+
+[pipe.bundle_to_chapters_plan]
+type = "PipeFunc"
+inputs = { bundle = "PlanningBundle" }
+output = "ChaptersPlan"
+function_name = "cyoa_bundle_to_chapters_plan"
+
+[pipe.bundle_to_chapter_details]
+type = "PipeFunc"
+inputs = { bundle = "PlanningBundle" }
+output = "ChapterDetail[]"
+function_name = "cyoa_bundle_to_chapter_details"
 
 [pipe.plan_state_vars]
 type = "PipeLLM"
@@ -167,7 +259,7 @@ type = "PipeLLM"
 inputs = { brief = "StoryBrief" }
 output = "Text"
 model = { model = "gpt-4o", temperature = 0.2 }
-prompt = "Return an empty but well-formed recap header in @brief.language (no plot facts yet)."
+prompt = "Return an empty but well-formed recap header in {{ (brief.language if brief is defined and brief.language is defined else \"en\") | tag(\"brief.language\") }} (no plot facts yet)."
 
 [pipe.process_all_chapters_sequential]
 type = "PipeSequence"
@@ -193,7 +285,7 @@ Create ChapterContext:
 - index (from batch), title, minutes_target (advisory)
 - prev_chapters_summary: compress @prev_sum to 5-8 lines
 - item_slot_mapping: map slot1/slot2 to 0-2 concrete items for THIS chapter (e.g., {"slot1":"rope","slot2":"lantern"})
-LANG=@brief.language
+LANG={{ (brief.language if brief is defined and brief.language is defined else "en") | tag("brief.language") }}
 """
 
 [pipe.stage_outline_for_chapter]
@@ -223,7 +315,7 @@ blueprint=@blueprint.patterns / @blueprint.pillars / @blueprint.mechanics
 Combat rubric:
 - up to 2 rounds micro-loop: setup -> approach menu (attack/defend/use_item/retreat) -> random check(s) -> bounded hp/item effects -> outcome -> route to bottleneck/hub.
 - Fail-forward: losing costs hp or time; never stalls; hp in [1..3]; on 0 -> shared death snippet later.
-LANG=@brief.language
+LANG={{ (brief.language if brief is defined and brief.language is defined else "en") | tag("brief.language") }}
 """
 
 [pipe.process_stages_sequential]
@@ -261,7 +353,7 @@ prompt = """
 Return StageNodes with:
 - stage_kind
 - nodes: List<NodePlan> fields {id,kind,chapter_id,stage_id,bg,audio,summary,target?,choices?,random_options?,libkey?}
-LANG=@brief.language
+LANG={{ (brief.language if brief is defined and brief.language is defined else "en") | tag("brief.language") }}
 Context recap:
 @ctx.prev_chapters_summary
 Items mapping:
@@ -341,9 +433,9 @@ prompt = """
 Render story.toml (graph only):
 
 [story]
-id = stable snake_case from @brief.working_title or derived
+id = stable snake_case from {{ (brief.working_title if brief is defined and brief.working_title is defined else "working_title") | tag("brief.working_title") }} or derived
 start_node = @graph.start_node
-title.@brief.language = derived title aligned with @brief.genre
+title.{{ (brief.language if brief is defined and brief.language is defined else "en") | tag("brief.language") }} = derived title aligned with {{ (brief.genre if brief is defined and brief.genre is defined else "adventure") | tag("brief.genre") }}
 version = "0.5"
 
 [assets]
@@ -390,7 +482,7 @@ You MUST return JSON with an 'items' array (3-6 objects). Example:
   {"node_id":"menu_1","prompt":"Warm illustration of a kid and a tiny robot...", "negative_prompt":"text overlay, watermark"},
   {"node_id":"menu_2","prompt":"Evening scene at the science fair tent...", "negative_prompt":""}
 ]}
-LANG=@brief.language
+LANG={{ (brief.language if brief is defined and brief.language is defined else "en") | tag("brief.language") }}
 Use Character voices and Blueprint pillars to set mood.
 Graph:
 @graph
@@ -405,7 +497,7 @@ type = "PipeLLM"
 inputs = { img_prompts = "ImagePrompts", settings = "Settings" }
 output = "ImageGenItem[]"
 model = { model = "gpt-4o", temperature = 0.0 }
-prompt = "For each prompt in @img_prompts.items, emit ImageGenItem with node_id, prompt, negative_prompt, width=@settings.image_width, height=@settings.image_height, out_path='assets/img/' + node_id + '.png'."
+prompt = "For each prompt in @img_prompts.items, emit ImageGenItem with node_id, prompt, negative_prompt, width={{ (settings.image_width if settings is defined and settings.image_width is defined else 512) | tag(\"settings.image_width\") }}, height={{ (settings.image_height if settings is defined and settings.image_height is defined else 384) | tag(\"settings.image_height\") }}, out_path='assets/img/' + node_id + '.png'."
 
 [pipe.render_one_menu_image_flux]
 type = "PipeLLM"
@@ -460,7 +552,7 @@ inputs = { item = "NodeWorkItem", characters = "CharacterBible", brief = "StoryB
 output = "NodeLongText"
 model = { model = "gpt-4o", temperature = 0.7 }
 system_prompt = """
-Write long-form narration in @brief.language for one node.
+Write long-form narration in {{ (brief.language if brief is defined and brief.language is defined else "en") | tag("brief.language") }} for one node.
 Length guidance (no budgets): story nodes = rich scene (several paragraphs, ~1-10 minutes aloud depending on chapter role); menu/random nodes = short transitional beats.
 Keep POV/tone consistent with CharacterBible. Use concrete sensory detail, short paragraphs, and end on a forward-looking 'button'. Tags allowed sparingly: [pause 0.6s], <break time="400ms"/>.
 """
@@ -537,13 +629,6 @@ Settings:
 @settings
 """
 
-[pipe.debug_dump]
-type = "PipeLLM"
-inputs = { any = "Text" }
-output = "DebugManifest"
-model = { model = "gpt-4o", temperature = 0.0 }
-prompt = "Return a DebugManifest with one dummy path entry. Input: @any"
-
 [pipe.package_bundle]
 type = "PipeLLM"
 inputs = { story_toml = "StoryToml", tts_csv = "TTSScriptsCSV", img_prompts = "ImagePrompts", img_outputs = "ImageOutputsManifest", validation = "ValidationReport", blueprint = "Blueprint", chapters = "ChaptersPlan", characters = "CharacterBible" }
@@ -575,11 +660,12 @@ Inputs:
 # Orchestration
 # -------------------------
 
-[pipe.build_cyoa_story]
+[pipe.create_chapter_details]
 type = "PipeSequence"
-inputs = { brief = "StoryBrief", settings = "Settings" }
-output = "StoryBundle"
+inputs = { brief = "StoryBrief", settings = "Settings" }    
+output = "PlanningBundle"
 steps = [
+  { pipe = "expand_story_brief", result = "high_level_story" },
   { pipe = "design_blueprint", result = "blueprint" },
   { pipe = "character_bible", result = "characters" },
   { pipe = "chapterize", result = "chapters" },
@@ -587,7 +673,19 @@ steps = [
   { pipe = "chapters_outline_to_text", result = "chapters_text" },
   { pipe = "expand_chapters_sequential", result = "chapter_details" },
   { pipe = "require_complete_chapter_details", result = "chapter_details" },
-  { pipe = "persist_chapter_details", result = "chapter_details_path" },
+  { pipe = "pack_planning_bundle", result = "bundle" }
+]
+
+[pipe.build_cyoa_story]
+type = "PipeSequence"
+inputs = { brief = "StoryBrief", settings = "Settings" }
+output = "StoryBundle"
+steps = [
+  { pipe = "create_chapter_details", result = "bundle" },
+  { pipe = "bundle_to_blueprint", result = "blueprint" },
+  { pipe = "bundle_to_characters", result = "characters" },
+  { pipe = "bundle_to_chapters_plan", result = "chapters" },
+  { pipe = "bundle_to_chapter_details", result = "chapter_details" },
   { pipe = "plan_state_vars", result = "state" },
 
   { pipe = "init_prev_chapters_summary", result = "prev_sum" },
@@ -612,15 +710,4 @@ steps = [
   { pipe = "package_bundle", result = "bundle" }
 ]
 
-[pipe.plan_chapter_details]
-type = "PipeSequence"
-inputs = { brief = "StoryBrief", settings = "Settings" }
-output = "ChapterDetail[]"
-steps = [
-  { pipe = "design_blueprint", result = "blueprint" },
-  { pipe = "character_bible", result = "characters" },
-  { pipe = "chapterize", result = "chapters" },
-  { pipe = "chapters_to_outline_items", result = "chapter_outline_items" },
-  { pipe = "chapters_outline_to_text", result = "chapters_text" },
-  { pipe = "expand_chapters_sequential", result = "chapter_details" }
-]
+

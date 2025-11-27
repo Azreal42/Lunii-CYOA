@@ -2,9 +2,8 @@
 
 from __future__ import annotations
 
-from pathlib import Path
 import os
-from typing import Any
+from pathlib import Path
 
 from google import genai
 from PIL import Image

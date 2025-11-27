@@ -5,6 +5,8 @@ return lightweight TextContent placeholders instead of performing real work.
 """
 
 from datetime import datetime, timezone
+from typing import Any
+import json
 from pathlib import Path
 
 from kajson.kajson_manager import KajsonManager
@@ -13,13 +15,64 @@ from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.pipes.input_requirements import TypedNamedInputRequirement
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.core.stuffs.stuff_content import StuffContent
-from pipelex.core.stuffs.stuff_content import StuffContentType
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.text_content import TextContent
-from pipelex.core.stuffs.stuff import Stuff
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.hub import get_required_concept
 from pipelex.system.registries.func_registry import func_registry
+
+
+class StoryBriefContent(StructuredContent):
+    native_prompt: str
+    language: str
+    audience: str | None = None
+    genre: str | None = None
+    working_title: str | None = None
+
+
+class SettingsContent(StructuredContent):
+    target_runtime_min: int
+    advisory_max_states: int
+    debug: bool
+    out_dir: str
+    text_dir: str
+    assets_dir: str
+    image_width: int
+    image_height: int
+    img_guidance: float
+    img_steps: int
+
+
+class BlueprintContent(StructuredContent):
+    patterns: dict[str, Any]
+    pillars: dict[str, Any]
+    mechanics: dict[str, Any]
+    continuity_rules: dict[str, Any]
+
+
+class CharacterBibleContent(StructuredContent):
+    protagonist: list[dict]
+    allies: list[dict]
+    foes: list[dict]
+    neutrals: list[dict]
+    voices: str | None = None
+
+
+class ChaptersPlanContent(StructuredContent):
+    chapter_count: int
+    chapter_titles: list[str]
+    minutes_per_chapter: list[int]
+    chapter_blurbs: list[str]
+
+
+class ChapterDetailContent(StructuredContent):
+    index: int
+    title: str
+    minutes: int
+    detailed_summary: str
+    beats: list[str]
+    obstacles: str
+    mood: str | None = None
 
 
 async def _return_placeholder(working_memory: WorkingMemory, label: str) -> TextContent:
@@ -89,6 +142,13 @@ class PlanningArtifactsContent(StructuredContent):
     run_dir: str
 
 
+class PlanningBundleContent(StructuredContent):
+    blueprint: BlueprintContent
+    characters: CharacterBibleContent
+    chapters: ChaptersPlanContent
+    chapter_details: ListContent[ChapterDetailContent]
+
+
 class ChapterOutlineItemContent(StructuredContent):
     index: int
     title: str
@@ -100,51 +160,45 @@ class ChapterDetailsPath(StructuredContent):
     path: str
 
 
-async def cyoa_stub_blueprint(working_memory: WorkingMemory) -> StructuredContent:
+async def cyoa_stub_blueprint(working_memory: WorkingMemory) -> BlueprintContent:
     """Return a lightweight placeholder blueprint."""
-    return StructuredContent.model_validate(
-        {
-            "patterns": "foldback with hubs/bottlenecks; short kid-friendly loops",
-            "pillars": "adventure, friendship, courage; time-bound quest; consistent POV",
-            "mechanics": "hp 1..3; two boolean item slots per chapter; small randomness; fail-forward",
-            "continuity_rules": "hp persists; items reset per chapter; recap at chapter start",
-        }
+    return BlueprintContent(
+        patterns={"structure": "foldback with hubs/bottlenecks", "pacing": "short kid-friendly loops"},
+        pillars={"themes": "adventure, friendship, courage", "tone": "hopeful urgency", "POV": "kid"},
+        mechanics={"hp": "1..3", "items": "two booleans per chapter", "randomness": "small fail-forward"},
+        continuity_rules={"hp": "persists", "items": "reset per chapter", "recap": "start of chapter"},
     )
 
 
-async def cyoa_stub_character_bible(working_memory: WorkingMemory) -> StructuredContent:
+async def cyoa_stub_character_bible(working_memory: WorkingMemory) -> CharacterBibleContent:
     """Return a placeholder cast aligned with generic adventure."""
-    return StructuredContent.model_validate(
-        {
-            "protagonist": "Curious kid on a quest with a helpful companion.",
-            "allies": "A loyal guide and a handful of friendly locals met en route.",
-            "foes": "Obstacles and a shadowy opposing force creating tension.",
-            "neutrals": "Colorful bystanders who add texture but stay impartial.",
-            "voices": "Warm, clear narration with playful tempo; gentle urgency.",
-        }
+    return CharacterBibleContent(
+        protagonist=[{"description": "Curious kid on a quest with a helpful companion."}],
+        allies=[{"description": "A loyal guide and a handful of friendly locals met en route."}],
+        foes=[{"description": "Obstacles and a shadowy opposing force creating tension."}],
+        neutrals=[{"description": "Colorful bystanders who add texture but stay impartial."}],
+        voices="Warm, clear narration with playful tempo; gentle urgency.",
     )
 
 
-async def cyoa_stub_chapters_plan(working_memory: WorkingMemory) -> StructuredContent:
+async def cyoa_stub_chapters_plan(working_memory: WorkingMemory) -> ChaptersPlanContent:
     """Return a short, generic chapters plan."""
-    return StructuredContent.model_validate(
-        {
-            "chapter_count": 6,
-            "chapter_titles": ["Arrival", "Meeting the Guide", "Forest Whispers", "Trials", "The Deadline", "Homecoming"],
-            "minutes_per_chapter": [2, 2, 2, 2, 2, 2],
-            "chapter_blurbs": [
-                "Hero enters the strange world and sets the goal.",
-                "A guide appears and offers help.",
-                "Mysteries deepen; clues surface.",
-                "Tests of courage and skill shape the journey.",
-                "Clock is ticking; stakes rise.",
-                "Goal reached; lesson learned; epilogue hint.",
-            ],
-        }
+    return ChaptersPlanContent(
+        chapter_count=6,
+        chapter_titles=["Arrival", "Meeting the Guide", "Forest Whispers", "Trials", "The Deadline", "Homecoming"],
+        minutes_per_chapter=[2, 2, 2, 2, 2, 2],
+        chapter_blurbs=[
+            "Hero enters the strange world and sets the goal.",
+            "A guide appears and offers help.",
+            "Mysteries deepen; clues surface.",
+            "Tests of courage and skill shape the journey.",
+            "Clock is ticking; stakes rise.",
+            "Goal reached; lesson learned; epilogue hint.",
+        ],
     )
 
 
-async def cyoa_persist_planning_artifacts(working_memory: WorkingMemory) -> StructuredContent:
+async def cyoa_persist_planning_artifacts(working_memory: WorkingMemory) -> PlanningArtifactsContent:
     """Write blueprint/characters/chapters JSON dumps to disk for quick inspection."""
 
     def _dump(content: StructuredContent, path: Path) -> str:
@@ -171,19 +225,34 @@ async def cyoa_persist_planning_artifacts(working_memory: WorkingMemory) -> Stru
     )
 
 
-async def cyoa_seed_planning_inputs(working_memory: WorkingMemory) -> StructuredContent:
+async def cyoa_seed_planning_inputs(working_memory: WorkingMemory) -> TextContent:
     """Ensure dry-run has StoryBrief and Settings stuffs populated."""
 
-    def _seed_if_missing(name: str, concept_string: str) -> None:
-        if working_memory.get_optional_stuff(name):
+    def _needs_seed(name: str, required_attr: str) -> bool:
+        stuff = working_memory.get_optional_stuff(name)
+        if not stuff:
+            return True
+        return not hasattr(stuff.content, required_attr)
+
+    def _seed_if_missing(name: str, concept_string: str, required_attr: str) -> None:
+        if not _needs_seed(name, required_attr):
             return
         concept = get_required_concept(concept_string=concept_string)
-        structure_class: type[StuffContent] = KajsonManager.get_class_registry().get_required_subclass(
-            name=concept.structure_class_name,
-            base_class=StuffContent,
-        )
+        structure_class: type[StuffContent] | None = None
+        try:
+            structure_class = KajsonManager.get_class_registry().get_required_subclass(
+                name=concept.structure_class_name,
+                base_class=StuffContent,
+            )
+        except Exception:
+            fallback_map: dict[str, type[StructuredContent]] = {
+                "Settings": SettingsContent,
+                "StoryBrief": StoryBriefContent,
+            }
+            structure_class = fallback_map.get(concept.code)
         if concept.code == "Settings":
-            content = structure_class(  # type: ignore[call-arg]
+            factory_class = structure_class or SettingsContent
+            content = factory_class(  # type: ignore[call-arg]
                 target_runtime_min=10,
                 advisory_max_states=50,
                 debug=True,
@@ -196,7 +265,8 @@ async def cyoa_seed_planning_inputs(working_memory: WorkingMemory) -> Structured
                 img_steps=20,
             )
         elif concept.code == "StoryBrief":
-            content = structure_class(  # type: ignore[call-arg]
+            factory_class = structure_class or StoryBriefContent
+            content = factory_class(  # type: ignore[call-arg]
                 native_prompt="Dry run prompt",
                 language="en",
                 audience="8-10",
@@ -212,18 +282,28 @@ async def cyoa_seed_planning_inputs(working_memory: WorkingMemory) -> Structured
             )
             content = WorkingMemoryFactory.create_mock_content(requirement)
         stuff = StuffFactory.make_stuff(concept=concept, content=content, name=name)
-        working_memory.add_new_stuff(name=name, stuff=stuff)
+        existing = working_memory.get_optional_stuff(name)
+        if existing:
+            working_memory.replace_stuff(name=name, stuff=stuff)
+        else:
+            working_memory.add_new_stuff(name=name, stuff=stuff)
 
-    # Try seeding for the current domain first, then fallback to main CYOA domain.
+    errors: list[str] = []
+    seeded = False
     for domain_code in ("cyoa_plan", "cyoa"):
         try:
-            _seed_if_missing("brief", f"{domain_code}.StoryBrief")
-            _seed_if_missing("settings", f"{domain_code}.Settings")
+            _seed_if_missing("brief", f"{domain_code}.StoryBrief", "native_prompt")
+            _seed_if_missing("settings", f"{domain_code}.Settings", "target_runtime_min")
+            seeded = True
             break
-        except Exception:
+        except Exception as exc:
+            errors.append(f"{domain_code}: {exc}")
             continue
 
-    return StructuredContent.model_validate({"status": "seeded"})
+    if not seeded and errors:
+        raise ValueError(f"Failed to seed planning inputs: {'; '.join(errors)}")
+
+    return TextContent(text="seeded")
 
 
 async def cyoa_make_chapter_outline_items(working_memory: WorkingMemory) -> ListContent[ChapterOutlineItemContent]:
@@ -232,10 +312,12 @@ async def cyoa_make_chapter_outline_items(working_memory: WorkingMemory) -> List
     if not chapters_stuff:
         return ListContent(items=[])
 
-    chapters = chapters_stuff.content
-    titles = getattr(chapters, "chapter_titles", []) or []
-    minutes = getattr(chapters, "minutes_per_chapter", []) or []
-    blurbs = getattr(chapters, "chapter_blurbs", []) or []
+    chapters_content = chapters_stuff.content
+    data = _to_dict(chapters_content)
+
+    titles = data.get("chapter_titles") or getattr(chapters_content, "chapter_titles", []) or []
+    minutes = data.get("minutes_per_chapter") or getattr(chapters_content, "minutes_per_chapter", []) or []
+    blurbs = data.get("chapter_blurbs") or getattr(chapters_content, "chapter_blurbs", []) or []
 
     items: list[ChapterOutlineItemContent] = []
     for idx, title in enumerate(titles):
@@ -277,7 +359,7 @@ async def cyoa_persist_chapter_details(working_memory: WorkingMemory) -> Chapter
     return ChapterDetailsPath(path=str(target))
 
 
-async def cyoa_require_complete_chapter_details(working_memory: WorkingMemory) -> ListContent:
+async def cyoa_require_complete_chapter_details(working_memory: WorkingMemory) -> ListContent[ChapterDetailContent]:
     """Fail fast if chapter_details count differs from outline count; pass-through otherwise."""
     details_stuff = working_memory.get_optional_stuff("chapter_details")
     outline_stuff = working_memory.get_optional_stuff("chapter_outline_items")
@@ -285,15 +367,169 @@ async def cyoa_require_complete_chapter_details(working_memory: WorkingMemory) -
         raise ValueError("chapter_details or chapter_outline_items missing for count check")
 
     details_list = details_stuff.as_list_content()
+    if len(details_list.items) == 1 and isinstance(details_list.items[0], TextContent):
+        try:
+            raw = details_list.items[0].text
+            parsed = json.loads(raw)
+            items = parsed.get("items") if isinstance(parsed, dict) else None
+            if isinstance(items, list):
+                details_list = ListContent(items=[ChapterDetailContent.model_validate(item) for item in items])
+        except Exception:
+            pass
     outline_list = outline_stuff.as_list_content()
 
     if len(details_list.items) != len(outline_list.items):
         msg = f"chapter_details count={len(details_list.items)} does not match outline count={len(outline_list.items)}"
         raise ValueError(msg)
 
-    # return unchanged to keep pipeline dataflow simple
-    return details_list
+    coerced_items: list[ChapterDetailContent] = []
+    for item in details_list.items:
+        if isinstance(item, ChapterDetailContent):
+            coerced_items.append(item)
+        else:
+            coerced_items.append(ChapterDetailContent.model_validate(_to_dict(item)))
 
+    return ListContent(items=coerced_items)
+
+
+def _to_dict(content: StuffContent) -> dict:
+    def _strip_code_fence(text: str) -> str:
+        stripped = text.strip()
+        if stripped.startswith("```"):
+            parts = stripped.split("\n", 1)
+            stripped = parts[1] if len(parts) > 1 else ""
+            if stripped.endswith("```"):
+                stripped = stripped.rsplit("```", 1)[0].rstrip()
+        return stripped
+
+    if isinstance(content, TextContent):
+        text = getattr(content, "text")
+        if isinstance(text, str):
+            stripped = _strip_code_fence(text)
+            try:
+                return json.loads(stripped)
+            except Exception:
+                return {"text": text}
+    if hasattr(content, "model_dump"):
+        try:
+            return content.model_dump()
+        except Exception:
+            pass
+    return {"text": str(content)}
+
+
+def _get_planning_bundle(working_memory: WorkingMemory) -> PlanningBundleContent:
+    bundle_stuff = working_memory.get_optional_stuff("bundle") or working_memory.get_optional_stuff("planning_bundle")
+    if not bundle_stuff:
+        raise ValueError("PlanningBundle not found in working memory")
+    content = bundle_stuff.content
+    if not isinstance(content, PlanningBundleContent):
+        # Defensive: allow plain dict payloads created by validators
+        return PlanningBundleContent.model_validate(content)
+    return content
+
+
+async def cyoa_pack_planning_bundle(working_memory: WorkingMemory) -> PlanningBundleContent:
+    """Pack blueprint, characters, chapters, and chapter_details into a single bundle."""
+    blueprint = working_memory.get_optional_stuff("blueprint")
+    characters = working_memory.get_optional_stuff("characters")
+    chapters = working_memory.get_optional_stuff("chapters")
+    chapter_details = working_memory.get_optional_stuff("chapter_details")
+    missing = [
+        name
+        for name, stuff in (("blueprint", blueprint), ("characters", characters), ("chapters", chapters), ("chapter_details", chapter_details))
+        if stuff is None
+    ]
+    if missing:
+        raise ValueError(f"Cannot pack PlanningBundle; missing stuffs: {', '.join(missing)}")
+
+    def _parse_json_if_text(content: StuffContent) -> dict | StuffContent:
+        if not isinstance(content, TextContent):
+            return content
+
+        raw = content.text.strip()
+        if raw.startswith("```"):
+            raw = raw.lstrip("`")
+            # Drop optional language tag like json or JSON after backticks
+            raw = raw.split("\n", 1)[-1]
+        if raw.endswith("```"):
+            raw = raw[:-3].rstrip()
+
+        try:
+            return json.loads(raw)
+        except Exception:
+            return content
+
+    def _to_plain_dict(content: StuffContent | dict) -> dict:
+        if isinstance(content, dict):
+            return content
+        if isinstance(content, TextContent):
+            parsed = _parse_json_if_text(content)
+            if isinstance(parsed, dict):
+                return parsed
+        if hasattr(content, "model_dump"):
+            try:
+                return content.model_dump(serialize_as_any=True)  # type: ignore[call-arg]
+            except Exception:
+                pass
+        parsed = _parse_json_if_text(content) if isinstance(content, StuffContent) else content
+        return parsed if isinstance(parsed, dict) else {}
+
+    def _coerce_char_entries(value: dict, key: str) -> None:
+        entries = value.get(key, [])
+        coerced: list[dict[str, Any]] = []
+        for item in entries:
+            if isinstance(item, dict):
+                coerced.append(item)
+            elif isinstance(item, str):
+                coerced.append({"description": item})
+        value[key] = coerced
+
+    blueprint_payload = _to_plain_dict(blueprint.content)
+    characters_payload = _to_plain_dict(characters.content)
+    chapters_payload = _to_plain_dict(chapters.content)
+
+    for character_key in ("protagonist", "allies", "foes", "neutrals"):
+        _coerce_char_entries(characters_payload, character_key)
+
+    return PlanningBundleContent(
+        blueprint=BlueprintContent.model_validate(blueprint_payload),
+        characters=CharacterBibleContent.model_validate(characters_payload),
+        chapters=ChaptersPlanContent.model_validate(chapters_payload),
+        chapter_details=chapter_details.as_list_content(),
+    )
+
+
+async def cyoa_bundle_to_blueprint(working_memory: WorkingMemory) -> BlueprintContent:
+    bundle = _get_planning_bundle(working_memory)
+    data = bundle.blueprint
+    if isinstance(data, StructuredContent):
+        return data
+    return BlueprintContent.model_validate(data)
+
+
+async def cyoa_bundle_to_characters(working_memory: WorkingMemory) -> CharacterBibleContent:
+    bundle = _get_planning_bundle(working_memory)
+    data = bundle.characters
+    if isinstance(data, StructuredContent):
+        return data
+    return CharacterBibleContent.model_validate(data)
+
+
+async def cyoa_bundle_to_chapters_plan(working_memory: WorkingMemory) -> ChaptersPlanContent:
+    bundle = _get_planning_bundle(working_memory)
+    data = bundle.chapters
+    if isinstance(data, StructuredContent):
+        return data
+    return ChaptersPlanContent.model_validate(data)
+
+
+async def cyoa_bundle_to_chapter_details(working_memory: WorkingMemory) -> ListContent[ChapterDetailContent]:
+    bundle = _get_planning_bundle(working_memory)
+    details = bundle.chapter_details
+    if isinstance(details, ListContent):
+        return details
+    return ListContent[ChapterDetailContent].model_validate(details)
 
 # Register all functions on import so the CLI `pipelex validate` sees them.
 func_registry.register_functions_dict(
@@ -317,5 +553,10 @@ func_registry.register_functions_dict(
         "cyoa_outline_to_text": cyoa_outline_to_text,
         "cyoa_persist_chapter_details": cyoa_persist_chapter_details,
         "cyoa_require_complete_chapter_details": cyoa_require_complete_chapter_details,
+        "cyoa_pack_planning_bundle": cyoa_pack_planning_bundle,
+        "cyoa_bundle_to_blueprint": cyoa_bundle_to_blueprint,
+        "cyoa_bundle_to_characters": cyoa_bundle_to_characters,
+        "cyoa_bundle_to_chapters_plan": cyoa_bundle_to_chapters_plan,
+        "cyoa_bundle_to_chapter_details": cyoa_bundle_to_chapter_details,
     }
 )

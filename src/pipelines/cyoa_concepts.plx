@@ -30,19 +30,19 @@ working_title = { type = "text", description = "Working title", required = false
 [concept.Blueprint]
 description = "Design doctrine and constraints."
 [concept.Blueprint.structure]
-patterns = { type = "text", description = "Structural patterns (foldback, hubs, bottlenecks)", required = true }
-pillars = { type = "text", description = "Tone, POV, themes, stakes", required = true }
-mechanics = { type = "text", description = "HP, per-chapter items, randomness", required = true }
-continuity_rules = { type = "text", description = "Rules for cross-chapter continuity", required = true }
+patterns = { type = "dict", key_type = "text", value_type = "text", description = "Structural patterns (foldback, hubs, bottlenecks)", required = true }
+pillars = { type = "dict", key_type = "text", value_type = "text", description = "Tone, POV, themes, stakes", required = true }
+mechanics = { type = "dict", key_type = "text", value_type = "text", description = "HP, per-chapter items, randomness", required = true }
+continuity_rules = { type = "dict", key_type = "text", value_type = "text", description = "Rules for cross-chapter continuity", required = true }
 
 [concept.CharacterBible]
 description = "Cast and voice notes (for later TTS guidance only)."
 [concept.CharacterBible.structure]
-protagonist = { type = "text", description = "Main character notes", required = true }
-allies = { type = "text", description = "Supporting characters", required = true }
-foes = { type = "text", description = "Antagonists", required = true }
-neutrals = { type = "text", description = "Neutral characters", required = true }
-voices = { type = "text", description = "Voice guidance", required = true }
+protagonist = { type = "list", item_type = "dict", description = "Main character notes", required = true }
+allies = { type = "list", item_type = "dict", description = "Supporting characters", required = true }
+foes = { type = "list", item_type = "dict", description = "Antagonists", required = true }
+neutrals = { type = "list", item_type = "dict", description = "Neutral characters", required = true }
+voices = { type = "text", description = "Voice guidance", required = false }
 
 [concept.ChaptersPlan]
 description = "Chapterization and time budgets (advisory)."

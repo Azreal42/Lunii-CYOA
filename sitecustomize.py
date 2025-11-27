@@ -26,4 +26,4 @@ if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
 # Import side-effects register the functions.
-import lunii_cyoa.pipe_funcs  # noqa: F401
+import lunii_cyoa.pipe_funcs  # noqa: F401,E402

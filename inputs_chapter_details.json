@@ -1,0 +1,28 @@
+{
+  "brief": {
+    "concept": "cyoa.StoryBrief",
+    "content": {
+      "native_prompt": "A playful fox guides a lost child through a neon forest to find home before midnight.",
+      "language": "en",
+      "audience": "7-9",
+      "genre": "adventure",
+      "working_title": "Neon Trails"
+    }
+  },
+  "settings": {
+    "concept": "cyoa.Settings",
+    "content": {
+      "target_runtime_min": 12,
+      "advisory_max_states": 30,
+      "debug": false,
+      "out_dir": "results/planning_demo",
+      "text_dir": "results/planning_demo/texts",
+      "assets_dir": "results/planning_demo/assets",
+      "image_width": 768,
+      "image_height": 576,
+      "img_guidance": 5.0,
+      "img_steps": 25
+    }
+  }
+}
+

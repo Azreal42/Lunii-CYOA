@@ -45,7 +45,7 @@ inputs = {
 
 async def main():
     res = await execute_pipeline(plx_content=plx, inputs=inputs, pipe_run_mode=PipeRunMode.LIVE, search_domains=["cyoa"])
-    pretty_print(res, title="CYOA demo output")
+    pretty_print(res, title="CYOA test output")
 
 if __name__ == "__main__":
     asyncio.run(main())
